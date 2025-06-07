@@ -107,12 +107,12 @@ wcwidth==0.2.13
 websockets==15.0.1
 Werkzeug==3.1.3
 wrapt==1.17.2
-streamlit
-yfinance
-pandas
-numpy
-matplotlib
-scikit-learn
-keras
+streamlit==1.45.1
+yfinance==0.2.36
+pandas==2.2.3
+numpy==2.1.3
+matplotlib==3.8.4
+scikit-learn==1.4.2
+keras==3.2.1
 
 
