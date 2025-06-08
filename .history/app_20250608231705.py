@@ -1,11 +1,36 @@
 import numpy as np
 import pandas as pd
-import yfinance as yf
+from alpha_vantage.async_support.timeseries import TimeSeries
 from keras.models import load_model
 import streamlit as st
 import matplotlib.pyplot as plt
 import datetime
 from sklearn.preprocessing import MinMaxScaler
+import asyncio
+import os
+from os import environ
+
+# ------------------ API Key Check ------------------ #
+def check_api_key():
+    api_key = os.environ.get("ALPHA_VANTAGE_API_KEY")
+    if not api_key:
+        st.error("""
+        ⚠️ Alpha Vantage API key not found! Please follow these steps:
+
+        1. Get a free API key from: https://www.alphavantage.co/support/#api-key
+        2. Open PowerShell as administrator
+        3. Run this command (replace with your actual API key):
+           ```
+           [System.Environment]::SetEnvironmentVariable('ALPHA_VANTAGE_API_KEY', 'YOUR_API_KEY', 'User')
+           ```
+        4. Close and reopen PowerShell
+        5. Restart this Streamlit app
+        """)
+        st.stop()
+    return api_key
+
+# Get API key
+api_key = check_api_key()
 
 # ------------------ Streamlit App: Stock Price Predictor ------------------ #
 
@@ -115,7 +140,7 @@ with st.sidebar:
             This Stock Market Predictor is an advanced machine learning application that helps investors and traders make informed decisions. It combines historical data analysis with deep learning to predict future stock price movements.
             
             <ul class='project-features'>
-                <li>Real-time stock data fetching using Yahoo Finance API</li>
+                <li>Real-time stock data fetching using Alpha Vantage API</li>
                 <li>Interactive visualizations with moving averages (100 & 200 days)</li>
                 <li>Deep learning model trained on historical price patterns</li>
                 <li>Price prediction visualization compared to actual trends</li>
@@ -130,17 +155,27 @@ st.title('📈 Stock Price Predictor')
 
 # Input: Stock symbol
 ticker = st.text_input('Enter Stock Symbol (e.g. AAPL, GOOGL, TSLA)', 'AAPL')
-start_date = '2015-03-01'
-end_date = datetime.datetime.now().strftime('%Y-%m-%d')
 
-# Fetch stock data from yfinance
-try:
-    df = yf.download(ticker, start=start_date, end=end_date)
-    if df.empty:
-        st.error("No data found for this stock symbol.")
-        st.stop()
-except Exception as e:
-    st.error(f"Error fetching stock data: {e}")
+async def get_stock_data(symbol):
+    # Initialize Alpha Vantage API
+    ts = TimeSeries(key=api_key, output_format='pandas')
+    try:
+        # Fetch stock data from Alpha Vantage
+        data, meta_data = await ts.get_daily(symbol=symbol, outputsize='full')
+        await ts.close()  # Close the session
+        # Rename columns to match our previous format
+        data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        # Sort index to ascending order
+        return data.sort_index(ascending=True)
+    except Exception as e:
+        st.error(f"Error fetching stock data: {e}")
+        return None
+
+# Use asyncio to run the async function
+df = asyncio.run(get_stock_data(ticker))
+
+if df is None or df.empty:
+    st.error("No data found for this stock symbol.")
     st.stop()
 
 # Data Overview
@@ -163,20 +198,93 @@ plot_chart('Closing Price', df['Close'])
 # Moving Averages
 ma100 = df['Close'].rolling(100).mean()
 ma200 = df['Close'].rolling(200).mean()
-st.subheader('📊 Closing Price with 100 & 200-Day Moving Averages')
-plot_chart('Moving Averages', df['Close'], ma100, ma200)
+
+# Plot 100-day Moving Average
+st.subheader('📊 Closing Price with 100-Day Moving Average')
+fig_ma100 = plt.figure(figsize=(12,6))
+plt.plot(df['Close'], label='Closing Price', alpha=0.8)
+plt.plot(ma100, label='100-Day MA', color='red', linewidth=2)
+plt.title('100-Day Moving Average vs Closing Price')
+plt.xlabel('Date')
+plt.ylabel('Price ($)')
+plt.ylim(0, 1550)  # Set y-axis range
+plt.legend()
+plt.grid(True, alpha=0.3)
+st.pyplot(fig_ma100)
+
+# Plot 200-day Moving Average
+st.subheader('📊 Closing Price with 200-Day Moving Average')
+fig_ma200 = plt.figure(figsize=(12,6))
+plt.plot(df['Close'], label='Closing Price', alpha=0.8)
+plt.plot(ma200, label='200-Day MA', color='blue', linewidth=2)
+plt.title('200-Day Moving Average vs Closing Price')
+plt.xlabel('Date')
+plt.ylabel('Price ($)')
+plt.ylim(0, 1550)  # Set y-axis range
+plt.legend()
+plt.grid(True, alpha=0.3)
+st.pyplot(fig_ma200)
+
+# Combined Moving Averages Plot
+st.subheader('📊 Combined Moving Averages Analysis')
+fig_combined = plt.figure(figsize=(12,6))
+plt.plot(df['Close'], label='Closing Price', alpha=0.6)
+plt.plot(ma100, label='100-Day MA', color='red', linewidth=2)
+plt.plot(ma200, label='200-Day MA', color='blue', linewidth=2)
+plt.title('Combined Moving Averages Analysis')
+plt.xlabel('Date')
+plt.ylabel('Price ($)')
+plt.ylim(0, 1550)  # Set y-axis range
+plt.legend()
+plt.grid(True, alpha=0.3)
+st.pyplot(fig_combined)
+
+# Add Moving Average Crossover Analysis
+st.subheader('Moving Average Crossover Analysis')
+crossover_text = """
+The Moving Average Crossover Analysis helps identify potential trading signals:
+- When the 100-day MA crosses above the 200-day MA: Potential bullish signal (Golden Cross)
+- When the 100-day MA crosses below the 200-day MA: Potential bearish signal (Death Cross)
+"""
+st.write(crossover_text)
+
+# Calculate current position of MAs
+current_ma100 = ma100.iloc[-1]
+current_ma200 = ma200.iloc[-1]
+current_price = df['Close'].iloc[-1]
+
+# Display current values
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Current Price", f"${current_price:.2f}")
+with col2:
+    st.metric("100-Day MA", f"${current_ma100:.2f}")
+with col3:
+    st.metric("200-Day MA", f"${current_ma200:.2f}")
+
+# Market Position Analysis
+if current_ma100 > current_ma200:
+    if current_price > current_ma100:
+        st.success("Strong Uptrend: Price is above both moving averages, and 100-day MA is above 200-day MA")
+    else:
+        st.info("Potential Uptrend: 100-day MA is above 200-day MA, but price is below 100-day MA")
+else:
+    if current_price < current_ma100:
+        st.error("Strong Downtrend: Price is below both moving averages, and 100-day MA is below 200-day MA")
+    else:
+        st.warning("Potential Downtrend: 100-day MA is below 200-day MA, but price is above 100-day MA")
 
 # Split data into train/test
 train_data = df['Close'][:int(len(df)*0.7)]
-test_data = df['Close'][:int(len(df)*0.7)]
+test_data = df['Close'][int(len(df)*0.7):]
 
 # Normalize the data
 scaler = MinMaxScaler(feature_range=(0,1))
-train_array = scaler.fit_transform(train_data)
+train_array = scaler.fit_transform(np.array(train_data).reshape(-1, 1))
 
 # Load model
 try:
-    model = load_model('keras_model.keras')  # Use relative path on Render
+    model = load_model('keras_model.keras')
 except Exception as e:
     st.error(f"Error loading model: {e}")
     st.stop()
@@ -184,7 +292,7 @@ except Exception as e:
 # Prepare test data for prediction
 past_100_days = train_data.tail(100)
 final_df = pd.concat([past_100_days, test_data], ignore_index=True)
-input_data = scaler.transform(final_df)
+input_data = scaler.transform(np.array(final_df).reshape(-1, 1))
 
 x_test = []
 y_test = []
@@ -220,21 +328,18 @@ with col1:
     current_price = df['Close'].iloc[-1]
     st.metric(
         label="Current Price",
-        value = f"${current_price.iloc[0]:.2f}"
-
+        value=f"${current_price:.2f}"
     )
     
     high_price = df['High'].max()
     low_price = df['Low'].min()
     st.metric(
         label="All-Time High",
-        value = f"${high_price.iloc[0]:.2f}"
-
+        value=f"${high_price:.2f}"
     )
     st.metric(
         label="All-Time Low",
-    value=f"${low_price.iloc[0]:.2f}"
-
+        value=f"${low_price:.2f}"
     )
 
 with col2:
@@ -244,12 +349,11 @@ with col2:
     
     st.metric(
         label="Latest Volume",
-        value=f"{latest_volume.iloc[0]:,.0f}"
-
+        value=f"{latest_volume:,.0f}"
     )
     st.metric(
         label="Average Volume",
-        value = f"{avg_volume.iloc[0]:,.0f}"
+        value=f"{avg_volume:,.0f}"
     )
 
 print(type(df['Volume']))
@@ -259,7 +363,7 @@ print(df['Volume'].shape)
 st.subheader('Trading Volume History')
 fig3 = plt.figure(figsize=(12,6))
 plt.plot(df.index, df['Volume'], color='purple', alpha=0.6)
-plt.fill_between(df.index, df['Volume'].squeeze(), color='purple', alpha=0.2)
+plt.fill_between(df.index, df['Volume'], color='purple', alpha=0.2)
 plt.grid(True, alpha=0.3)
 plt.xlabel('Date')
 plt.ylabel('Volume')

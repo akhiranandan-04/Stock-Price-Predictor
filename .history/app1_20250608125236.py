@@ -167,8 +167,8 @@ st.subheader('📊 Closing Price with 100 & 200-Day Moving Averages')
 plot_chart('Moving Averages', df['Close'], ma100, ma200)
 
 # Split data into train/test
-train_data = df['Close'][:int(len(df)*0.7)]
-test_data = df['Close'][:int(len(df)*0.7)]
+train_data = df['Close'][:int(len(df)*0.7)].to_frame()
+test_data = df['Close'][int(len(df)*0.7):].to_frame()
 
 # Normalize the data
 scaler = MinMaxScaler(feature_range=(0,1))
@@ -209,59 +209,26 @@ plt.ylabel('Stock Price')
 plt.legend()
 st.pyplot(fig2)
 
-
-
-# Summary Section
-st.subheader('Stock Summary Statistics')
+# Metrics
+st.subheader('📌 Stock Summary Statistics')
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### Price Statistics")
-    current_price = df['Close'].iloc[-1]
-    st.metric(
-        label="Current Price",
-        value = f"${current_price.iloc[0]:.2f}"
-
-    )
-    
-    high_price = df['High'].max()
-    low_price = df['Low'].min()
-    st.metric(
-        label="All-Time High",
-        value = f"${high_price.iloc[0]:.2f}"
-
-    )
-    st.metric(
-        label="All-Time Low",
-    value=f"${low_price.iloc[0]:.2f}"
-
-    )
+    st.metric("Current Price", f"${df['Close'].iloc[-1]:.2f}")
+    st.metric("All-Time High", f"${df['High'].max():.2f}")
+    st.metric("All-Time Low", f"${df['Low'].min():.2f}")
 
 with col2:
-    st.markdown("### Volume Statistics")
-    latest_volume = df['Volume'].iloc[-1]
-    avg_volume = df['Volume'].mean()
-    
-    st.metric(
-        label="Latest Volume",
-        value=f"{latest_volume.iloc[0]:,.0f}"
+    st.metric("Latest Volume", f"{int(df['Volume'].iloc[-1]):,}")
+    st.metric("Average Volume", f"{int(df['Volume'].mean()):,}")
 
-    )
-    st.metric(
-        label="Average Volume",
-        value = f"{avg_volume.iloc[0]:,.0f}"
-    )
-
-print(type(df['Volume']))
-print(df['Volume'].shape)
-
-# Volume Chart
-st.subheader('Trading Volume History')
+# Volume chart
+st.subheader('📦 Trading Volume History')
 fig3 = plt.figure(figsize=(12,6))
 plt.plot(df.index, df['Volume'], color='purple', alpha=0.6)
-plt.fill_between(df.index, df['Volume'].squeeze(), color='purple', alpha=0.2)
-plt.grid(True, alpha=0.3)
+plt.fill_between(df.index, df['Volume'], color='purple', alpha=0.2)
 plt.xlabel('Date')
 plt.ylabel('Volume')
+plt.grid(True)
 st.pyplot(fig3)
 plt.close()

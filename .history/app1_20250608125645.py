@@ -209,59 +209,41 @@ plt.ylabel('Stock Price')
 plt.legend()
 st.pyplot(fig2)
 
+# Metrics
+required_columns = {'Close', 'High', 'Low', 'Volume'}
+if not df.empty and required_columns.issubset(df.columns):
+    st.subheader('📌 Stock Summary Statistics')
+    col1, col2 = st.columns(2)
 
+    with col1:
+        try:
+            current_price = float(df['Close'].iloc[-1])
+            all_time_high = float(df['High'].max())
+            all_time_low = float(df['Low'].min())
+            st.metric("Current Price", f"${current_price:.2f}")
+            st.metric("All-Time High", f"${all_time_high:.2f}")
+            st.metric("All-Time Low", f"${all_time_low:.2f}")
+        except (IndexError, ValueError, TypeError):
+            st.error("Error retrieving price data.")
 
-# Summary Section
-st.subheader('Stock Summary Statistics')
-col1, col2 = st.columns(2)
+    with col2:
+        try:
+            latest_volume = int(df['Volume'].iloc[-1])
+            avg_volume = int(df['Volume'].mean())
+            st.metric("Latest Volume", f"{latest_volume:,}")
+            st.metric("Average Volume", f"{avg_volume:,}")
+        except (IndexError, ValueError, TypeError):
+            st.error("Error retrieving volume data.")
 
-with col1:
-    st.markdown("### Price Statistics")
-    current_price = df['Close'].iloc[-1]
-    st.metric(
-        label="Current Price",
-        value = f"${current_price.iloc[0]:.2f}"
-
-    )
-    
-    high_price = df['High'].max()
-    low_price = df['Low'].min()
-    st.metric(
-        label="All-Time High",
-        value = f"${high_price.iloc[0]:.2f}"
-
-    )
-    st.metric(
-        label="All-Time Low",
-    value=f"${low_price.iloc[0]:.2f}"
-
-    )
-
-with col2:
-    st.markdown("### Volume Statistics")
-    latest_volume = df['Volume'].iloc[-1]
-    avg_volume = df['Volume'].mean()
-    
-    st.metric(
-        label="Latest Volume",
-        value=f"{latest_volume.iloc[0]:,.0f}"
-
-    )
-    st.metric(
-        label="Average Volume",
-        value = f"{avg_volume.iloc[0]:,.0f}"
-    )
-
-print(type(df['Volume']))
-print(df['Volume'].shape)
-
-# Volume Chart
-st.subheader('Trading Volume History')
-fig3 = plt.figure(figsize=(12,6))
-plt.plot(df.index, df['Volume'], color='purple', alpha=0.6)
-plt.fill_between(df.index, df['Volume'].squeeze(), color='purple', alpha=0.2)
-plt.grid(True, alpha=0.3)
-plt.xlabel('Date')
-plt.ylabel('Volume')
-st.pyplot(fig3)
-plt.close()
+    # Volume chart
+    st.subheader('📦 Trading Volume History')
+    fig3 = plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['Volume'], color='purple', alpha=0.6)
+    plt.fill_between(df.index, df['Volume'], color='purple', alpha=0.2)
+    plt.xlabel('Date')
+    plt.ylabel('Volume')
+    plt.grid(True)
+    st.pyplot(fig3)
+    plt.close()
+else:
+    st.error("Data is not loaded or missing required columns.")
