@@ -151,6 +151,7 @@ with st.sidebar:
 
 # ------------------ Main App ------------------ #
 
+
 st.title('📈 Stock Price Predictor')
 
 # Input: Stock symbol
@@ -172,11 +173,18 @@ async def get_stock_data(symbol):
         return None
 
 # Use asyncio to run the async function
-df = asyncio.run(get_stock_data(ticker))
 
-if df is None or df.empty:
-    st.error("No data found for this stock symbol.")
-    st.stop()
+df = None
+
+if st.button("Fetch Stock Data"):
+    if ticker.strip() == "":
+        st.warning("Please enter a stock symbol.")
+    else:
+        df = asyncio.run(get_stock_data(ticker))
+
+        if df is None or df.empty:
+            st.error("No data found for this stock symbol.")
+            st.stop()
 
 # Data Overview
 st.subheader('Stock Data Overview')
